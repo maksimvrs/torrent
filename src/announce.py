@@ -37,7 +37,6 @@ class Announce(object):
                 print(tracker + " ERROR")
                 print(error.request.url)
                 continue
-        self.response = bdecode(b'd8:intervali1800e5:peers6:\xb0;\xc9\x12\x1b9e')
         peers_raw = self.response[b'peers']
         while len(peers_raw) >= 6:
             peer = ((".".join(map(str, peers_raw[0:4])),
@@ -45,5 +44,4 @@ class Announce(object):
             if peer not in self.peers:
                 self.peers.append(peer)
             peers_raw = peers_raw[6:]
-        print(self.peers)
 
