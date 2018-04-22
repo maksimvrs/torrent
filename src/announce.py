@@ -45,5 +45,4 @@ class Announce(object):
             if peer not in self.peers:
                 self.peers.append(peer)
             peers_raw = peers_raw[6:]
-        print(self.peers)
 
