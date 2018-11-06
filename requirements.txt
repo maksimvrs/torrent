@@ -1,0 +1,6 @@
+PyQt5
+aiohttp
+bitstring
+requests
+btdht
+six
