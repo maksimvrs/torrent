@@ -1,5 +1,6 @@
 import asyncio
 import logging
+import time
 from asyncio import Queue
 from concurrent.futures import CancelledError
 
@@ -72,8 +73,13 @@ class PeerConnection:
 
     async def _start(self):
         while 'stopped' not in self.my_state:
-            ip, port = await self.queue.get()
-            logging.info('Got assigned peer with: {ip}'.format(ip=ip))
+            peer = await self.queue.get()
+            if peer:
+                ip, port = peer
+                logging.info('Got assigned peer with: {ip}'.format(ip=ip))
+            else:
+                time.sleep(30)
+                continue
 
             try:
                 # TODO For some reason it does not seem to work to open a new
@@ -99,7 +105,6 @@ class PeerConnection:
                 # Start reading responses as a stream of messages for as
                 # long as the connection is open and data is transmitted
                 async for message in PeerStreamIterator(self.reader, buffer):
-                    # logging.info("Iteration " + ip)
                     if 'stopped' in self.my_state:
                         break
                     if type(message) is BitField:
@@ -113,6 +118,7 @@ class PeerConnection:
                     elif type(message) is Choke:
                         self.peer_state.append('choked')
                     elif type(message) is Unchoke:
+                        logging.info("Unchocke")
                         if 'choked' in self.peer_state:
                             self.peer_state.remove('choked')
                     elif type(message) is Have:
@@ -134,6 +140,8 @@ class PeerConnection:
                         # TODO Add support for sending data
                         logging.info('Ignoring the received Cancel message.')
 
+                    logging.info(str(self.peer_state) + str(self.my_state))
+
                     # Send block request to remote peer if we're interested
                     if 'choked' not in self.peer_state:
                         if 'interested' in self.my_state:
@@ -148,9 +156,8 @@ class PeerConnection:
             except (ConnectionResetError, CancelledError):
                 logging.warning('Connection closed')
             except Exception as e:
-                logging.exception('Undefind error: ' + str(e))
+                logging.exception('Undefind error: ' + str(e) + str(message))
                 self.cancel()
-                raise e
         self.cancel()
 
     def cancel(self):
@@ -252,6 +259,7 @@ class PeerStreamIterator:
         while True:
             try:
                 data = await self.reader.read(PeerStreamIterator.CHUNK_SIZE)
+                logging.info(str(data))
                 if data:
                     self.buffer += data
                     message = self.parse()

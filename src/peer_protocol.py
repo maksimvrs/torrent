@@ -143,9 +143,14 @@ class BitField(PeerMessage):
     @classmethod
     def decode(cls, data: bytes):
         message_length = struct.unpack('>I', data[:4])[0]
+        parts = struct.unpack('>Ib' + str(len(data) - 5) + 's', data)[2][:message_length - 1]
 
-        parts = struct.unpack('>Ib' + str(message_length - 1) + 's', data)
-        return cls(parts[2])
+        # parts_list = []
+        # for i in parts:
+            # parts_list.extend(list(bin(i))[3:])
+        # return parts_list
+
+        return cls(parts)
 
     def __str__(self):
         return 'BitField'

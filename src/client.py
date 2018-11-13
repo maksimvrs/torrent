@@ -3,6 +3,7 @@ import logging
 import math
 import os
 import time
+import hashlib
 from asyncio import Queue
 # import btdht
 # import binascii
@@ -114,8 +115,10 @@ class TorrentClient:
                             self.available_peers.put_nowait(peer)
                 except:
                     pass
+
             else:
                 await asyncio.sleep(5)
+
         self.stop()
 
     def _empty_queue(self):
@@ -232,8 +235,9 @@ class Piece:
 
         :return: True or False
         """
-        # print(self.hash, sha1(self.data).digest())
-        # return self.hash == sha1(self.data).digest()
+
+        logging.info(self.hash, hashlib.sha1(self.data).digest())
+        # return self.hash == hashlib.sha1(self.data).digest()
         return True
 
     @property
