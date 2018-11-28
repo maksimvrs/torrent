@@ -74,13 +74,14 @@ class PeerConnection:
     async def _start(self):
         while 'stopped' not in self.my_state:
             peer = await self.queue.get()
+            self.my_state = []
+            self.peer_state = []
             if peer:
                 ip, port = peer
                 logging.info('Got assigned peer with: {ip}'.format(ip=ip))
             else:
                 time.sleep(30)
                 continue
-
             try:
                 # TODO For some reason it does not seem to work to open a new
                 # connection if the first one drops (i.e. second loop).
@@ -140,7 +141,7 @@ class PeerConnection:
                         # TODO Add support for sending data
                         logging.info('Ignoring the received Cancel message.')
 
-                    logging.info(str(self.peer_state) + str(self.my_state))
+                    logging.info(ip + ": " + str(self.peer_state) + str(self.my_state))
 
                     # Send block request to remote peer if we're interested
                     if 'choked' not in self.peer_state:
@@ -167,8 +168,12 @@ class PeerConnection:
         logging.info('Closing peer {id}'.format(id=self.remote_id))
         if not self.future.done():
             self.future.cancel()
+
         if self.writer:
             self.writer.close()
+
+        if self.reader:
+            self.reader.close()
 
         self.queue.task_done()
 
@@ -259,7 +264,6 @@ class PeerStreamIterator:
         while True:
             try:
                 data = await self.reader.read(PeerStreamIterator.CHUNK_SIZE)
-                logging.info(str(data))
                 if data:
                     self.buffer += data
                     message = self.parse()
@@ -334,6 +338,7 @@ class PeerStreamIterator:
                     return Choke()
                 elif message_id is PeerMessage.Unchoke:
                     _consume()
+                    print("It is unchoke")
                     return Unchoke()
                 elif message_id is PeerMessage.Have:
                     data = _data()

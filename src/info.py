@@ -96,7 +96,7 @@ class Info(object):
 
     @property
     def name(self) -> str:
-        return self.__metainfo__[b'name']
+        return self.__metainfo__[b'name'].decode('utf-8')
 
     @property
     def length(self) -> int:

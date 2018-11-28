@@ -236,7 +236,7 @@ class Piece:
         :return: True or False
         """
 
-        logging.info(self.hash, hashlib.sha1(self.data).digest())
+        # logging.info(self.hash, hashlib.sha1(self.data).digest())
         # return self.hash == hashlib.sha1(self.data).digest()
         return True
 
@@ -324,6 +324,9 @@ class PieceManager:
         """
         return len(self.have_pieces) == self.total_pieces
 
+    def bytes_downloaded_changed(self):
+        pass
+
     @property
     def bytes_downloaded(self) -> int:
         """
@@ -409,6 +412,8 @@ class PieceManager:
                                                      peer_id=peer_id))
 
         logging.info(self.bytes_downloaded)
+
+        self.bytes_downloaded_changed()
 
         # Remove from pending requests
         for index, request in enumerate(self.pending_blocks):
