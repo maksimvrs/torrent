@@ -6,7 +6,7 @@ import random
 import datetime
 from string import ascii_letters, digits
 
-from src.bencoding import *
+from src.bencoding import Decoder, Encoder
 
 PREFIX = '-DR'
 VERSION = '0001'
@@ -18,7 +18,6 @@ class Info(object):
     """
     def __init__(self, file_name):
         self.file_name = file_name
-        self.files = []
 
         with open(self.file_name, 'rb') as file:
             self.data = Decoder(file.read()).decode()
@@ -47,11 +46,11 @@ class Info(object):
             raise AttributeError("The torrent file does not have an attribute name")
         if b'length' not in self.__metainfo__ and b'files' not in self.__metainfo__:
             raise AttributeError("The torrent file does not have an attribute length or files")
-        if b'files' in self.__metainfo__:
-            if b'length' not in self.__metainfo__[b'files']:
-                raise AttributeError("The torrent file does not have an attribute length")
-            if b'name' not in self.__metainfo__[b'files']:
-                raise AttributeError("The torrent file does not have an attribute path")
+        # if b'files' in self.__metainfo__:
+        #     if b'length' not in self.__metainfo__[b'files']:
+        #         raise AttributeError("The torrent file does not have an attribute length")
+        #     if b'name' not in self.__metainfo__[b'files']:
+        #         raise AttributeError("The torrent file does not have an attribute path")
 
     @property
     def announce(self) -> str:
@@ -87,8 +86,8 @@ class Info(object):
         return self.__metainfo__[b'piece length']
 
     @property
-    def pieces(self) -> bytes:
-        return self.__metainfo__[b'pieces']
+    def pieces(self) -> list:
+        return [self.__metainfo__[b'pieces'][i:i+20] for i in range(0, len(self.__metainfo__[b'pieces']), 20)]
 
     @property
     def private(self) -> bool:
@@ -99,10 +98,15 @@ class Info(object):
         return self.__metainfo__[b'name'].decode('utf-8')
 
     @property
-    def length(self) -> int:
+    def length(self):
         if self.is_multi_file:
-            return self.__metainfo__[b'files'][b'length']
+            return sum([i[b'length'] for i in self.__metainfo__[b'files']])
         return self.__metainfo__[b'length']
+
+    @property
+    def files(self) -> list:
+        return [{'length': file[b'length'],
+                 'path': [path.decode() for path in file[b'path']]} for file in self.__metainfo__[b'files']]
 
     @property
     def md5sum(self) -> str:

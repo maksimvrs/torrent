@@ -1,17 +1,18 @@
 import asyncio
 import logging
 import math
-import os
 import time
 import hashlib
 from asyncio import Queue
-# import btdht
-# import binascii
 
 from src.tracker import Tracker
 from src.peer import PeerConnection, REQUEST_SIZE
+from src.uploader import Uploader
+from src.file_manager import FileManager
 
-MAX_PEER_CONNECTIONS = 40
+MAX_PEER_CONNECTIONS = 35
+MAX_PEER_UPLOAD_CONNECTIONS = 15
+SPEED_CALCULATE_INTERVAL = 1
 
 
 class TorrentClient:
@@ -30,10 +31,16 @@ class TorrentClient:
     be waiting until there is a peer to consume in the queue.
     """
 
-    def __init__(self, info):
+    def __init__(self, info, files, work_path):
         self.tracker = Tracker(info)
         self.info = info
 
+        self.files = files
+        self.work_path = work_path
+
+        self.prev_speed_check_time = None
+        self.downloaded = []
+        self.speed = 0
         # self.dht = btdht.DHT()
 
         # The list of potential peers is the work queue, consumed by the
@@ -46,7 +53,12 @@ class TorrentClient:
         # The piece manager implements the strategy on which pieces to
         # request, as well as the logic to persist received pieces to disk.
 
-        self.piece_manager = PieceManager(info)
+        self.uploader_queue = Queue()
+        self.uploaders = []
+
+        self.listener = None
+
+        self.piece_manager = PieceManager(info, self.files, self.work_path)
         self.abort = False
 
     async def start(self):
@@ -57,83 +69,78 @@ class TorrentClient:
         peers to communicate with. Once the torrent is fully downloaded or
         if the download is aborted this method will complete.
         """
+        self.listener = asyncio.ensure_future(self.listen())
+
         self.peers = [PeerConnection(self.available_peers,
                                      self.tracker.info.hash20,
                                      self.info.peer_id,
                                      self.piece_manager,
                                      self._on_block_retrieved)
                       for _ in range(MAX_PEER_CONNECTIONS)]
+        self.piece_manager.start_time = time.time()
 
-        # The time we last made an announce call (timestamp)
-        previous = None
-        # Default interval between announce calls (in seconds)
-        interval = 5 * 60
+        self.uploaders = [Uploader(self.uploader_queue, self.piece_manager)] * MAX_PEER_UPLOAD_CONNECTIONS
 
-        # dht_previous = time.time()
-        # dht_interval = 3 * 60
-        # self.dht.start()
+        first = True
+        interval = 15
+
+        self.prev_speed_check_time = time.time()
 
         while True:
-            if self.piece_manager.is_complete:
-                logging.info('Torrent fully downloaded!')
-                break
-            if self.abort:
-                logging.info('Aborting download...')
-                break
+            try:
+                response = await self.tracker.connect(
+                    first=first,
+                    uploaded=self.piece_manager.bytes_uploaded,
+                    downloaded=self.piece_manager.bytes_downloaded
+                )
 
-            current = time.time()
+                logging.info("Tracker response: {resp}".format(resp=response))
 
-            # if dht_previous + dht_interval < current:
-            #     try:
-            #         dht_response = self.dht.get_peers(self.info.hash20)
+                if response:
+                    first = False
+                    interval = response.interval
+                    self._empty_queue()
+                    for peer in response.peers:
+                        await self.available_peers.put(peer)
+
+            except Exception as e:
+                logging.error(e)
+
+            await asyncio.sleep(interval)
+
+            # dht_previous = None
+            # dht_interval = 5 * 60
             #
-            #         print("DHT peers: ", dht_response)
-            #         # if dht_response:
-            #         #     dht_previous = current
-            #         #     self._empty_queue()
-            #         #     for peer in dht_response:
-            #         #         self.available_peers.put_nowait(peer)
+            # current = time.time()
+            #
+            # if (dht_previous is None) or (dht_previous + dht_interval) < current:
+            #     try:
+            #         response = await self.tracker.connect_dht()
+            #         print("DHT: ", response)
+            #         if response:
+            #             dht_previous = current
+            #             # for peer in response.peers:
+            #             #     if peer not in self.available_peers:
+            #             #         self.available_peers.put_nowait(peer)
             #     except Exception as e:
             #         print("DHT ERROR: ", e)
             #         pass
 
-            if (not previous) or (previous + interval < current):
-                try:
-                    response = await self.tracker.connect(
-                        first=previous if previous else False,
-                        uploaded=self.piece_manager.bytes_uploaded,
-                        downloaded=self.piece_manager.bytes_downloaded
-                    )
-
-                    logging.info("Tracker response: {resp}".format(resp=response))
-
-                    if response:
-                        previous = current
-                        interval = response.interval
-                        self._empty_queue()
-                        for peer in response.peers:
-                            self.available_peers.put_nowait(peer)
-                except:
-                    pass
-
-            else:
-                await asyncio.sleep(5)
-
-        self.stop()
+            await self.stop()
 
     def _empty_queue(self):
         while not self.available_peers.empty():
             self.available_peers.get_nowait()
 
-    def stop(self):
+    async def stop(self):
         """
         Stop the download or seeding process.
         """
         self.abort = True
         for peer in self.peers:
-            peer.stop()
-        self.piece_manager.close()
-        self.tracker.close()
+            await peer.stop()
+        self.piece_manager.file_manager.close()
+        await self.tracker.close()
 
     def _on_block_retrieved(self, peer_id, piece_index, block_offset, data):
         """
@@ -145,9 +152,28 @@ class TorrentClient:
         :param block_offset: The block offset within its piece
         :param data: The binary data retrieved
         """
+        self.downloaded.append((len(data), time.time()))
+        if time.time() - self.prev_speed_check_time >= SPEED_CALCULATE_INTERVAL:
+            while len(self.downloaded) >= 2 and \
+                    self.downloaded[-1][1] - self.downloaded[0][1] > SPEED_CALCULATE_INTERVAL * 5:
+                del self.downloaded[0]
+            size = sum([i[0] for i in self.downloaded])
+            time_interval = self.downloaded[-1][1] - self.downloaded[0][1]
+            self.speed = size / time_interval
+            self.prev_speed_check_time = time.time()
+
         self.piece_manager.block_received(
             peer_id=peer_id, piece_index=piece_index,
             block_offset=block_offset, data=data)
+
+    async def new_connection_handle(self, reader, writer):
+        self.uploader_queue.put_nowait((reader, writer))
+
+    async def listen(self):
+        server = await asyncio.start_server(self.new_connection_handle, '0.0.0.0', 6889)
+        addr = server.sockets[0].getsockname()
+        async with server:
+            await server.serve_forever()
 
 
 class Block:
@@ -235,10 +261,7 @@ class Piece:
 
         :return: True or False
         """
-
-        # logging.info(self.hash, hashlib.sha1(self.data).digest())
-        # return self.hash == hashlib.sha1(self.data).digest()
-        return True
+        return self.hash == hashlib.sha1(self.data).digest()
 
     @property
     def data(self):
@@ -263,17 +286,23 @@ class PieceManager:
     this implementation.
     """
 
-    def __init__(self, info):
+    def __init__(self, info, files, work_path):
         self.info = info
+        self.files = files
+        self.work_path = work_path
+        self.file_manager = FileManager(self.info, self.files, self.work_path)
+        self.file_manager.open()
+        self.start_time = None
         self.peers = {}
         self.pending_blocks = []
         self.missing_pieces = self._init_pieces()
         self.ongoing_pieces = []
         self.have_pieces = []
         self.max_pending_time = 30 * 1000  # 30 second
-
         self.total_pieces = len(info.pieces)
-        self.fd = os.open(self.info.name, os.O_RDWR | os.O_CREAT)
+
+        # self.have_pieces = self.missing_pieces[0:int(len(self.missing_pieces)*0.9)]
+        # del self.missing_pieces[0:int(len(self.missing_pieces)*0.9)]
 
     def _init_pieces(self) -> [Piece]:
         """
@@ -305,15 +334,10 @@ class PieceManager:
                     last_block = blocks[-1]
                     last_block.length = last_length % REQUEST_SIZE
                     blocks[-1] = last_block
-            pieces.append(Piece(index, blocks, hash_value))
+            piece = Piece(index, blocks, hash_value)
+            if self.file_manager.need_piece(piece):
+                pieces.append(piece)
         return pieces
-
-    def close(self):
-        """
-        Close any resources used by the PieceManager (such as open files)
-        """
-        if self.fd:
-            os.close(self.fd)
 
     @property
     def is_complete(self):
@@ -334,12 +358,16 @@ class PieceManager:
 
         This method Only counts full, verified, pieces, not single blocks.
         """
-        return len(self.have_pieces) * self.info.piece_length
+        return len(self.have_pieces) * self.info.piece_length - \
+            ((self.info.length % self.info.piece_length) if self.is_complete else 0)
 
     @property
     def bytes_uploaded(self) -> int:
-        # TODO Add support for sending data
         return 0
+
+    @property
+    def speed(self):
+        return self.bytes_downloaded / (time.time() - self.start_time)
 
     def add_peer(self, peer_id, bitfield):
         """
@@ -384,10 +412,18 @@ class PieceManager:
         if peer_id not in self.peers:
             logging.warning("Peer not in piece manager")
             # return None
-            for index, piece in enumerate(self.missing_pieces):
-                piece = self.missing_pieces.pop(index)
-                self.ongoing_pieces.append(piece)
+            if len(self.missing_pieces) != 0:
+                piece = self.missing_pieces.pop(0)
                 return piece.next_request()
+            return None
+
+        if len(self.missing_pieces) < MAX_PEER_CONNECTIONS:
+            block = self._next_missing(peer_id)
+            if not block:
+                block = self._expired_requests(peer_id)
+                if not block:
+                    block = self._next_ongoing(peer_id)
+            return block
 
         block = self._expired_requests(peer_id)
         if not block:
@@ -411,10 +447,7 @@ class PieceManager:
                                                      piece_index=piece_index,
                                                      peer_id=peer_id))
 
-        logging.info(self.bytes_downloaded)
-
         self.bytes_downloaded_changed()
-
         # Remove from pending requests
         for index, request in enumerate(self.pending_blocks):
             if request.piece == piece_index and \
@@ -428,7 +461,7 @@ class PieceManager:
             piece.block_received(block_offset, data)
             if piece.is_complete():
                 if piece.is_hash_matching():
-                    self._write(piece)
+                    self.file_manager.write(piece)
                     self.ongoing_pieces.remove(piece)
                     self.have_pieces.append(piece)
                     complete = (self.total_pieces -
@@ -456,6 +489,7 @@ class PieceManager:
         """
         current = int(round(time.time() * 1000))
         for request in self.pending_blocks:
+            # Check Bitfield
             if self.peers[peer_id][request.piece]:
                 if request.start_time + self.max_pending_time < current:
                     logging.info('Re-requesting block {block} for '
@@ -467,12 +501,16 @@ class PieceManager:
                     return request
         return None
 
+    def _next_endgame(self, perr_id) -> Block:
+        pass
+
     def _next_ongoing(self, peer_id) -> Block:
         """
         Go through the ongoing pieces and return the next block to be
         requested or None if no block is left to be requested.
         """
         for piece in self.ongoing_pieces:
+            # Check Bitfield
             if self.peers[peer_id][piece.index]:
                 # Is there any blocks left to request in this piece?
                 block = piece.next_request()
@@ -502,6 +540,7 @@ class PieceManager:
                     return block
 
         for index, piece in enumerate(self.missing_pieces):
+            # Check Bitfield
             if self.peers[peer_id][piece.index]:
                 # Move this piece from missing to ongoing
                 piece = self.missing_pieces.pop(index)
@@ -510,12 +549,3 @@ class PieceManager:
                 # blocks (then it is ongoing).
                 return piece.next_request()
         return None
-
-    def _write(self, piece):
-        """
-        Write the given piece to disk
-        """
-        logging.info("Write piece {id}".format(id=piece.index))
-        pos = piece.index * self.info.piece_length
-        os.lseek(self.fd, pos, os.SEEK_SET)
-        os.write(self.fd, piece.data)

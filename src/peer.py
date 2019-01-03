@@ -1,10 +1,10 @@
 import asyncio
 import logging
-import time
 from asyncio import Queue
 from concurrent.futures import CancelledError
 
 from src.peer_protocol import *
+from src.peer_streem_iterator import PeerStreamIterator
 
 # The default request size for blocks of pieces is 2^14 bytes.
 #
@@ -20,6 +20,14 @@ REQUEST_SIZE = 2 ** 14
 
 class ProtocolError(BaseException):
     pass
+
+
+class PeerState:
+    Unchoke = 0
+    Choked = 1
+    Interested = 2
+    PendingRequest = 3
+    Stopped = 4
 
 
 class PeerConnection:
@@ -72,20 +80,16 @@ class PeerConnection:
         self.future = asyncio.ensure_future(self._start())  # Start this worker
 
     async def _start(self):
-        while 'stopped' not in self.my_state:
+        while PeerState.Stopped not in self.my_state:
             peer = await self.queue.get()
             self.my_state = []
             self.peer_state = []
-            if peer:
-                ip, port = peer
-                logging.info('Got assigned peer with: {ip}'.format(ip=ip))
-            else:
-                time.sleep(30)
-                continue
+            ip, port = peer
+            logging.info('Got assigned peer with: {ip}'.format(ip=ip))
             try:
                 # TODO For some reason it does not seem to work to open a new
                 # connection if the first one drops (i.e. second loop).
-                self.reader, self.writer = await asyncio.open_connection(ip, port)
+                self.reader, self.writer = await asyncio.wait_for(asyncio.open_connection(ip, port), 30)
                 logging.info('Connection open to peer: {ip}'.format(ip=ip))
 
                 # It's our responsibility to initiate the handshake.
@@ -97,57 +101,69 @@ class PeerConnection:
 
                 # The default state for a connection is that peer is not
                 # interested and we are choked
-                self.my_state.append('choked')
+                self.peer_state.append(PeerState.Choked)
 
                 # Let the peer know we're interested in downloading pieces
                 await self._send_interested()
-                self.my_state.append('interested')
+                self.my_state.append(PeerState.Interested)
 
                 # Start reading responses as a stream of messages for as
                 # long as the connection is open and data is transmitted
                 async for message in PeerStreamIterator(self.reader, buffer):
-                    if 'stopped' in self.my_state:
+                    if PeerState.Stopped in self.my_state:
                         break
-                    if type(message) is BitField:
+                    if message is None:
+                        if PeerState.PendingRequest in self.my_state:
+                            self.my_state.remove(PeerState.PendingRequest)
+                    elif type(message) is BitField:
                         self.piece_manager.add_peer(self.remote_id,
                                                     message.bitfield)
                     elif type(message) is Interested:
-                        self.peer_state.append('interested')
+                        self.peer_state.append(PeerState.Interested)
                     elif type(message) is NotInterested:
-                        if 'interested' in self.peer_state:
-                            self.peer_state.remove('interested')
+                        if PeerState.Interested in self.peer_state:
+                            self.peer_state.remove(PeerState.Interested)
                     elif type(message) is Choke:
-                        self.peer_state.append('choked')
+                        self.peer_state.append(PeerState.Choked)
                     elif type(message) is Unchoke:
-                        logging.info("Unchocke")
-                        if 'choked' in self.peer_state:
-                            self.peer_state.remove('choked')
+                        logging.info(PeerState.Unchoke)
+                        if PeerState.PendingRequest in self.my_state:
+                            self.my_state.remove(PeerState.PendingRequest)
+                        if PeerState.Choked in self.peer_state:
+                            self.peer_state.remove(PeerState.Choked)
                     elif type(message) is Have:
+                        if PeerState.PendingRequest in self.my_state:
+                            self.my_state.remove(PeerState.PendingRequest)
                         self.piece_manager.update_peer(self.remote_id,
                                                        message.index)
                     elif type(message) is KeepAlive:
+                        if PeerState.PendingRequest in self.my_state:
+                            self.my_state.remove(PeerState.PendingRequest)
                         pass
                     elif type(message) is Piece:
-                        self.my_state.remove('pending_request')
+                        self.my_state.remove(PeerState.PendingRequest)
                         self.on_block_cb(
                             peer_id=self.remote_id,
                             piece_index=message.index,
                             block_offset=message.begin,
                             data=message.block)
                     elif type(message) is Request:
-                        # TODO Add support for sending data
-                        logging.info('Ignoring the received Request message.')
+                        for piece in self.piece_manager.have_pieces:
+                            if piece[message.index].is_complete():
+                                data = self.piece_manager.file_manager.read(message.index, message.begin, message.length)
+                                self.writer.write(Piece(message.index, message.begin, data).encode())
+                                await self.writer.drain()
+                                logging.info("Send data")
                     elif type(message) is Cancel:
-                        # TODO Add support for sending data
-                        logging.info('Ignoring the received Cancel message.')
+                        pass
 
                     logging.info(ip + ": " + str(self.peer_state) + str(self.my_state))
 
                     # Send block request to remote peer if we're interested
-                    if 'choked' not in self.peer_state:
-                        if 'interested' in self.my_state:
-                            if 'pending_request' not in self.my_state:
-                                self.my_state.append('pending_request')
+                    if PeerState.Choked not in self.peer_state:
+                        if PeerState.Interested in self.my_state:
+                            if PeerState.PendingRequest not in self.my_state:
+                                self.my_state.append(PeerState.PendingRequest)
                                 await self._request_piece()
 
             except ProtocolError as e:
@@ -156,26 +172,24 @@ class PeerConnection:
                 logging.warning('Unable to connect to peer')
             except (ConnectionResetError, CancelledError):
                 logging.warning('Connection closed')
+            except StopAsyncIteration as e:
+                logging.exception(e)
+                await self.cancel()
             except Exception as e:
                 logging.exception('Undefind error: ' + str(e) + str(message))
-                self.cancel()
-        self.cancel()
+                await self.cancel()
+                continue
+        await self.cancel()
+        self.stop()
 
-    def cancel(self):
+    async def cancel(self, index, begin):
         """
         Sends the cancel message to the remote peer and closes the connection.
         """
         logging.info('Closing peer {id}'.format(id=self.remote_id))
-        if not self.future.done():
-            self.future.cancel()
 
-        if self.writer:
-            self.writer.close()
-
-        if self.reader:
-            self.reader.close()
-
-        self.queue.task_done()
+        self.writer.write(Cancel(index, begin))
+        await self.writer.drain()
 
     def stop(self):
         """
@@ -185,7 +199,12 @@ class PeerConnection:
         # Set state to stopped and cancel our future to break out of the loop.
         # The rest of the cleanup will eventually be managed by loop calling
         # `cancel`.
-        self.my_state.append('stopped')
+
+        self.my_state.append(PeerState.Stopped)
+        if self.writer:
+            self.writer.close()
+        # if self.queue:
+        #     self.queue.task_done()
         if not self.future.done():
             self.future.cancel()
 
@@ -214,7 +233,7 @@ class PeerConnection:
 
         buf = b''
         while len(buf) < Handshake.length:
-            buf = await self.reader.read(PeerStreamIterator.CHUNK_SIZE)
+            buf = await asyncio.wait_for(self.reader.read(PeerStreamIterator.CHUNK_SIZE), 15)
 
         response = Handshake.decode(buf[:Handshake.length])
         if not response:
@@ -238,127 +257,3 @@ class PeerConnection:
         logging.debug('Sending message: {type}'.format(type=message))
         self.writer.write(message.encode())
         await self.writer.drain()
-
-
-class PeerStreamIterator:
-    """
-    The `PeerStreamIterator` is an async iterator that continuously reads from
-    the given stream reader and tries to parse valid BitTorrent messages from
-    off that stream of bytes.
-
-    If the connection is dropped, something fails the iterator will abort by
-    raising the `StopAsyncIteration` error ending the calling iteration.
-    """
-    CHUNK_SIZE = 10 * 1024
-
-    def __init__(self, reader, initial: bytes = None):
-        self.reader = reader
-        self.buffer = initial if initial else b''
-
-    async def __aiter__(self):
-        return self
-
-    async def __anext__(self):
-        # Read data from the socket. When we have enough data to parse, parse
-        # it and return the message. Until then keep reading from stream
-        while True:
-            try:
-                data = await self.reader.read(PeerStreamIterator.CHUNK_SIZE)
-                if data:
-                    self.buffer += data
-                    message = self.parse()
-                    if message:
-                        self.buffer = b''
-                        return message
-                else:
-                    # logging.debug('No data read from stream')
-                    if self.buffer:
-                        message = self.parse()
-                        if message:
-                            self.buffer = b''
-                            return message
-                    raise StopAsyncIteration
-            except ConnectionResetError:
-                logging.debug('Connection closed by peer')
-                raise StopAsyncIteration
-            except CancelledError:
-                raise StopAsyncIteration
-            except Exception:
-                logging.exception('Error when iterating over stream!')
-                raise StopAsyncIteration
-        raise StopAsyncIteration
-
-    def parse(self):
-        """
-        Tries to parse protocol messages if there is enough bytes read in the
-        buffer.
-
-        :return The parsed message, or None if no message could be parsed
-        """
-        # Each message is structured as:
-        #     <length prefix><message ID><payload>
-        #
-        # The `length prefix` is a four byte big-endian value
-        # The `message ID` is a decimal byte
-        # The `payload` is the value of `length prefix`
-        #
-        # The message length is not part of the actual length. So another
-        # 4 bytes needs to be included when slicing the buffer.
-        header_length = 4
-
-        if len(self.buffer) > 4:  # 4 bytes is needed to identify the message
-            message_length = struct.unpack('>I', self.buffer[0:4])[0]
-
-            if message_length == 0:
-                return KeepAlive()
-
-            if len(self.buffer) >= message_length:
-                message_id = struct.unpack('>b', self.buffer[4:5])[0]
-
-                def _consume():
-                    """Consume the current message from the read buffer"""
-                    self.buffer = self.buffer[header_length + message_length:]
-
-                def _data():
-                    """"Extract the current message from the read buffer"""
-                    return self.buffer[:header_length + message_length]
-
-                if message_id is PeerMessage.BitField:
-                    data = _data()
-                    _consume()
-                    return BitField.decode(data)
-                elif message_id is PeerMessage.Interested:
-                    _consume()
-                    return Interested()
-                elif message_id is PeerMessage.NotInterested:
-                    _consume()
-                    return NotInterested()
-                elif message_id is PeerMessage.Choke:
-                    _consume()
-                    return Choke()
-                elif message_id is PeerMessage.Unchoke:
-                    _consume()
-                    print("It is unchoke")
-                    return Unchoke()
-                elif message_id is PeerMessage.Have:
-                    data = _data()
-                    _consume()
-                    return Have.decode(data)
-                elif message_id is PeerMessage.Piece:
-                    data = _data()
-                    _consume()
-                    return Piece.decode(data)
-                elif message_id is PeerMessage.Request:
-                    data = _data()
-                    _consume()
-                    return Request.decode(data)
-                elif message_id is PeerMessage.Cancel:
-                    data = _data()
-                    _consume()
-                    return Cancel.decode(data)
-                else:
-                    logging.info('Unsupported message!')
-            else:
-                pass
-                # logging.debug('Not enough in buffer in order to parse')
-        return None

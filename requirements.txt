@@ -1,3 +1,4 @@
+click
 PyQt5
 aiohttp
 bitstring

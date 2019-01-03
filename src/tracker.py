@@ -1,12 +1,17 @@
 import binascii
 
 import aiohttp
+import asyncio
 import logging
 import socket
 from struct import unpack
 import urllib.parse
+import btdht
 
-from . import bencoding
+from src import bencoding
+
+
+dht = btdht.DHT()
 
 
 class TrackerResponse:
@@ -99,10 +104,11 @@ class Tracker:
         self.info = info
         self.session = aiohttp.ClientSession()
 
-    async def dht(self):
-        self.dht.start()
-        await aiohttp.asyncio.sleep(15)
-        return self.dht.get_peers(binascii.a2b_hex(self.info.hash20))
+    @staticmethod
+    async def connect_dht():
+        dht.start()
+        await asyncio.sleep(15)
+        return dht.get_peers(binascii.a2b_hex("0403fb4728bd788fbcb67e87d6feb241ef38c75a"))
 
     async def connect(self,
                       first: bool = None,
@@ -131,14 +137,18 @@ class Tracker:
         url = self.info.announce + '?' + urllib.parse.urlencode(params)
         logging.info('Connecting to tracker at: ' + url)
 
-        async with self.session.get(url) as response:
-            if not response.status == 200:
-                raise ConnectionError('Unable to connect to tracker')
-            data = await response.read()
-            return TrackerResponse(bencoding.Decoder(data).decode())
+        try:
+            async with self.session.get(url) as response:
+                if not response.status == 200:
+                    raise ConnectionError('Unable to connect to tracker')
+                data = await response.read()
+                return TrackerResponse(bencoding.Decoder(data).decode())
+        except Exception as e:
+            logging.error(e)
+        return None
 
-    def close(self):
-        self.session.close()
+    async def close(self):
+        await self.session.close()
 
     def _construct_tracker_parameters(self):
         """
