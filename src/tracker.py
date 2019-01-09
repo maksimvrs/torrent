@@ -6,12 +6,6 @@ import logging
 import socket
 from struct import unpack
 import urllib.parse
-import btdht
-
-from src import bencoding
-
-
-dht = btdht.DHT()
 
 
 class TrackerResponse:
@@ -104,11 +98,11 @@ class Tracker:
         self.info = info
         self.session = aiohttp.ClientSession()
 
-    @staticmethod
-    async def connect_dht():
-        dht.start()
-        await asyncio.sleep(15)
-        return dht.get_peers(binascii.a2b_hex("0403fb4728bd788fbcb67e87d6feb241ef38c75a"))
+    # @staticmethod
+    # async def connect_dht():
+    #     dht.start()
+    #     await asyncio.sleep(15)
+        # return dht.get_peers(binascii.a2b_hex("0403fb4728bd788fbcb67e87d6feb241ef38c75a"))
 
     async def connect(self,
                       first: bool = None,
