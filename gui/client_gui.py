@@ -2,13 +2,12 @@ import logging
 
 from PyQt5 import QtWidgets, QtCore
 
-from src.gui import ClientThread
-from src.gui import TorrentWidget
-from src.gui import DownloadSettings
+from gui import ClientThread
+from gui import TorrentWidget
+from gui import DownloadSettings
 
 
 class ClientGUI(QtWidgets.QMainWindow):
-
     def __init__(self, parent=None):
         super(ClientGUI, self).__init__(parent)
         self.torrents = []
@@ -81,6 +80,7 @@ class ClientGUI(QtWidgets.QMainWindow):
     def open(self, file):
         try:
             self.client_thread = ClientThread(file)
+            # self.client_thread.error.connect(self.error)
         except (OSError, IOError) as e:
             logging.debug(e)
             return
@@ -91,6 +91,7 @@ class ClientGUI(QtWidgets.QMainWindow):
 
     def start(self):
         torrentWidget = TorrentWidget(self.client_thread)
+        torrentWidget.error.connect(self.error)
         self.client_thread.files = self.download_settings.files
         self.client_thread.work_path = self.download_settings.path
         self.client_thread.clientCreated.connect(torrentWidget.update_icon)
@@ -99,5 +100,13 @@ class ClientGUI(QtWidgets.QMainWindow):
         listWidgetItem.setSizeHint(torrentWidget.sizeHint())
         self.torrents_list.addItem(listWidgetItem)
         self.torrents_list.setItemWidget(listWidgetItem, torrentWidget)
+        self.torrents.append([listWidgetItem, torrentWidget])
 
         self.client_thread.start()
+
+    def error(self, message):
+        QtWidgets.QMessageBox.critical(self, 'Error', message)
+        for i in self.torrents:
+            if i[1] == self.sender():
+                self.torrents_list.removeItemWidget(i[0])
+

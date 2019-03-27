@@ -93,8 +93,7 @@ class TorrentClient:
                     uploaded=self.piece_manager.bytes_uploaded,
                     downloaded=self.piece_manager.bytes_downloaded
                 )
-
-                logging.info("Tracker response: {resp}".format(resp=response))
+                # logging.info("Tracker response: {resp}".format(resp=(response if response is not None else 'None')))
 
                 if response:
                     first = False
@@ -104,7 +103,7 @@ class TorrentClient:
                         await self.available_peers.put(peer)
 
             except Exception as e:
-                logging.error(e)
+                raise e
 
             await asyncio.sleep(interval)
 
@@ -126,7 +125,7 @@ class TorrentClient:
             #         print("DHT ERROR: ", e)
             #         pass
 
-            await self.stop()
+            # await self.stop()
 
     def _empty_queue(self):
         while not self.available_peers.empty():
@@ -138,7 +137,7 @@ class TorrentClient:
         """
         self.abort = True
         for peer in self.peers:
-            await peer.stop()
+            peer.stop()
         self.piece_manager.file_manager.close()
         await self.tracker.close()
 

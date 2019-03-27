@@ -33,12 +33,10 @@ class FileManager:
         if self.info.is_multi_file:
             for i in self.files:
                 directory = ""
-                print(self.info.files[i])
                 for subdir in self.info.files[i]['path'][:-1]:
                     directory += subdir
                     if not os.path.exists(self.work_path + directory):
                         os.makedirs(self.work_path + directory)
-                print(self.work_path + directory + self.info.files[i]['path'][-1])
                 self.fd.append(os.open(self.work_path + directory + self.info.files[i]['path'][-1], os.O_RDWR | os.O_CREAT))
         else:
             self.fd = os.open(self.work_path + self.info.name, os.O_RDWR | os.O_CREAT)

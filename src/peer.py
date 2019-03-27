@@ -201,7 +201,7 @@ class PeerConnection:
         # `cancel`.
 
         self.my_state.append(PeerState.Stopped)
-        if self.writer:
+        if self.writer is not None:
             self.writer.close()
         # if self.queue:
         #     self.queue.task_done()

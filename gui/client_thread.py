@@ -1,6 +1,6 @@
 import asyncio
 
-from PyQt5 import QtCore
+from PyQt5 import QtCore, QtWidgets
 
 from src.torrent_client import TorrentClient
 from src.info import Info
@@ -11,6 +11,7 @@ class ClientThread(QtCore.QThread):
     bytesDownloadedChanged = QtCore.pyqtSignal()
     speedChanged = QtCore.pyqtSignal()
     clientCreated = QtCore.pyqtSignal()
+    error = QtCore.pyqtSignal(['QString'])
 
     def __init__(self, file, parent=None):
         QtCore.QThread.__init__(self, parent)
@@ -24,7 +25,10 @@ class ClientThread(QtCore.QThread):
         self.client = TorrentClient(self.info, self.files, self.work_path)
         self.client.piece_manager.bytes_downloaded_changed = self.bytes_downloaded_changed
         self.clientCreated.emit()
-        await self.client.start()
+        try:
+            await self.client.start()
+        except Exception as e:
+            self.error.emit(str(e))
 
     def run(self):
         loop = asyncio.new_event_loop()

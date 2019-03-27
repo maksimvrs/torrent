@@ -1,9 +1,11 @@
 from PyQt5 import QtWidgets, QtGui, QtCore
 
-from src.gui import ClientThread
+from gui import ClientThread
 
 
 class TorrentWidget(QtWidgets.QWidget):
+    error = QtCore.pyqtSignal(['QString'])
+
     def __init__(self, client_thread, parent=None):
         super(TorrentWidget, self).__init__(parent)
 
@@ -12,6 +14,7 @@ class TorrentWidget(QtWidgets.QWidget):
 
         self.client_thread = client_thread
         self.client_thread.bytesDownloadedChanged.connect(self.update_status)
+        self.client_thread.error.connect(self.error)
 
         layout = QtWidgets.QHBoxLayout(self)
 
@@ -48,7 +51,6 @@ class TorrentWidget(QtWidgets.QWidget):
         self.progress_bar.setValue(self.client_thread.percent)
 
     def update_icon(self):
-        print("Icon was creadted")
         file_icon_provider = QtWidgets.QFileIconProvider()
         icon = file_icon_provider.icon(QtCore.QFileInfo(self.client_thread.work_path + self.client_thread.info.name))
         pixmap = icon.pixmap(QtCore.QSize(36, 36))

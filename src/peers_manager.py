@@ -38,7 +38,6 @@ class PeersManager:
                 del self.download_peers[i]
 
         while len(self.download_peers) < self.max_download_peers:
-            print(len(self.download_peers))
             ip, port = await self.peers.get()
             reader, writer = await asyncio.wait_for(asyncio.open_connection(ip, port), 30)
             peer = PeerConnection(reader, writer, self.info_hash, self.peer_id, self.piece_manager, self.on_block_cb,

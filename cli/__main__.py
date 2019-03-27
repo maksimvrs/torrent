@@ -48,6 +48,8 @@ def signal_handler(sig, frame):
 def main(file, path):
     """Simple torrent client"""
     if file is None or path in None:
+        with click.Context(main) as ctx:
+            click.echo(main.get_help(ctx))
         return
     loop = asyncio.new_event_loop()
     loop.run_until_complete(start(file, path))

@@ -1,11 +1,10 @@
-import binascii
-
 import aiohttp
-import asyncio
 import logging
 import socket
 from struct import unpack
 import urllib.parse
+
+from src import bencoding
 
 
 class TrackerResponse:
@@ -37,7 +36,7 @@ class TrackerResponse:
         Interval in seconds that the client should wait between sending
         periodic requests to the tracker.
         """
-        return self.response.get(b'interval', 0)
+        return self.response.get(b'interval', 15)
 
     @property
     def complete(self) -> int:
@@ -61,6 +60,10 @@ class TrackerResponse:
         # The BitTorrent specification specifies two types of responses. One
         # where the peers field is a list of dictionaries and one where all
         # the peers are encoded in a single string
+        print(self.response)
+
+        if b'peers' not in self.response:
+            return list()
         peers = self.response[b'peers']
         if type(peers) == list:
             # TODO Implement support for dictionary peer list
@@ -78,14 +81,17 @@ class TrackerResponse:
                     for p in peers]
 
     def __str__(self):
-        return "incomplete: {incomplete}\n" \
-               "complete: {complete}\n" \
-               "interval: {interval}\n" \
-               "peers: {peers}\n".format(
-            incomplete=self.incomplete,
-            complete=self.complete,
-            interval=self.interval,
-            peers=", ".join([x for (x, _) in self.peers]))
+        try:
+            return "incomplete: {incomplete}\n" \
+                   "complete: {complete}\n" \
+                   "interval: {interval}\n" \
+                   "peers: {peers}\n".format(
+                incomplete=self.incomplete,
+                complete=self.complete,
+                interval=self.interval,
+                peers=", ".join([x for (x, _) in self.peers]))
+        except Exception:
+            return None
 
 
 class Tracker:
@@ -96,7 +102,7 @@ class Tracker:
 
     def __init__(self, info):
         self.info = info
-        self.session = aiohttp.ClientSession()
+        self.session = aiohttp.ClientSession(connector=aiohttp.TCPConnector(verify_ssl=False))
 
     # @staticmethod
     # async def connect_dht():
@@ -139,6 +145,7 @@ class Tracker:
                 return TrackerResponse(bencoding.Decoder(data).decode())
         except Exception as e:
             logging.error(e)
+            raise e
         return None
 
     async def close(self):

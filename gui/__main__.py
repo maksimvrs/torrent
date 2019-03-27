@@ -2,7 +2,7 @@ import sys
 
 from PyQt5 import QtWidgets
 
-from src.gui.client_gui import ClientGUI
+from gui import ClientGUI
 
 
 if __name__ == '__main__':

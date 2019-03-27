@@ -2,11 +2,13 @@
 Torrent client on python
 
 # Install
-Install requirements:
+
+# Run
+
+## Install requirements:
 
 `pip install -r requirements.txt`
 
-# Run
 GUI:
 
 `python3 -m src.gui`
