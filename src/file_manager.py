@@ -6,7 +6,8 @@ class FileManager:
         """
         Args:
             info: Torrent info dictionary.
-            files: List of indices required for downloading files. File order as in info.
+            files: List of indices required for downloading files.
+                   File order as in info.
             work_path: Folder for downloading files.
         """
         self.info = info
@@ -37,9 +38,14 @@ class FileManager:
                     directory += subdir
                     if not os.path.exists(self.work_path + directory):
                         os.makedirs(self.work_path + directory)
-                self.fd.append(os.open(self.work_path + directory + self.info.files[i]['path'][-1], os.O_RDWR | os.O_CREAT))
+                self.fd.append(
+                    os.open(self.work_path
+                            + directory
+                            + self.info.files[i]['path'][-1],
+                            os.O_RDWR | os.O_CREAT))
         else:
-            self.fd = os.open(self.work_path + self.info.name, os.O_RDWR | os.O_CREAT)
+            self.fd = os.open(self.work_path + self.info.name,
+                              os.O_RDWR | os.O_CREAT)
 
     def write(self, piece):
         if self.info.is_multi_file:
@@ -47,17 +53,22 @@ class FileManager:
             offset = 0
             for i, file in enumerate(self.info.files):
                 if offset < self.info.piece_length * piece.index:
-                    begin.append((i, self.info.piece_length * piece.index - offset))
-                    if self.info.piece_length * (piece.index + 1) < offset + file['length']:
+                    begin.append(
+                        (i, self.info.piece_length * piece.index - offset))
+                    if self.info.piece_length * \
+                            (piece.index + 1) < offset + file['length']:
                         break
                 else:
                     offset += file['length']
             piece_offset = 0
             for file in begin:
                 os.lseek(self.fd[file[0]], file[1], os.SEEK_SET)
-                os.write(self.fd[file[0]], piece.data[piece_offset:min(piece_offset+self.info.files[file[0]],
-                                                                       len(piece.data)-piece_offset)])
-                piece_offset = min(piece_offset + self.info.files[file[0]], len(piece.data) - piece_offset)
+                os.write(self.fd[file[0]],
+                         piece.data[piece_offset:min(
+                             piece_offset + self.info.files[file[0]],
+                             len(piece.data) - piece_offset)])
+                piece_offset = min(piece_offset + self.info.files[file[0]],
+                                   len(piece.data) - piece_offset)
         else:
             pos = piece.index * self.info.piece_length
             os.lseek(self.fd, pos, os.SEEK_SET)
@@ -69,15 +80,18 @@ class FileManager:
             files_offset = 0
             for i, file in enumerate(self.info.files):
                 if files_offset < self.info.piece_length * index + offset:
-                    os.lseek(self.fd[i], index * self.info.piece_length + offset, os.SEEK_SET)
+                    os.lseek(self.fd[i], index *
+                             self.info.piece_length + offset, os.SEEK_SET)
                     data += os.read(self.fd[i], length)
-                    if self.info.piece_length * index + offset + length < files_offset + file['length']:
+                    if self.info.piece_length * index + offset + \
+                            length < files_offset + file['length']:
                         break
                 else:
                     offset += file['length']
             return data
         else:
-            os.lseek(self.fd, index * self.info.piece_length + offset, os.SEEK_SET)
+            os.lseek(self.fd, index * self.info.piece_length +
+                     offset, os.SEEK_SET)
             return os.read(self.fd, length)
 
     def close(self):

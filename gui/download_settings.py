@@ -38,7 +38,8 @@ class DownloadSettings(QtWidgets.QWidget):
         change_file_layout = QtWidgets.QHBoxLayout()
         change_file_layout.addWidget(QtWidgets.QLabel("Скачивать в "))
         self._path = QtWidgets.QLineEdit()
-        path_list = QtCore.QStandardPaths.standardLocations(QtCore.QStandardPaths.DownloadLocation)
+        path_list = QtCore.QStandardPaths.standardLocations(
+            QtCore.QStandardPaths.DownloadLocation)
         if path_list:
             self._path.setText(path_list[0])
         else:
@@ -67,11 +68,13 @@ class DownloadSettings(QtWidgets.QWidget):
 
     @property
     def files(self):
-        return [i for i, file in enumerate(self._files) if file.check_box.isChecked()]
+        return [i for i, file in enumerate(
+            self._files) if file.check_box.isChecked()]
 
     @property
     def path(self):
-        return self._path.text() if self._path.text()[-1] == '/' else self._path.text() + '/'
+        return self._path.text() if self._path.text(
+        )[-1] == '/' else self._path.text() + '/'
 
     def open(self):
         self.show()
@@ -90,7 +93,8 @@ class DownloadSettings(QtWidgets.QWidget):
             self.files_list.addItem(listWidgetItem)
 
     def _get_download_path(self):
-        download_path = QtWidgets.QFileDialog.getExistingDirectory(self, "Выберите папку для загрузки", self.path)
+        download_path = QtWidgets.QFileDialog.getExistingDirectory(
+            self, "Выберите папку для загрузки", self.path)
         if download_path:
             return download_path
         return self._path.text()

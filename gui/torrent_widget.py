@@ -10,7 +10,8 @@ class TorrentWidget(QtWidgets.QWidget):
         super(TorrentWidget, self).__init__(parent)
 
         if not isinstance(client_thread, ClientThread):
-            raise TypeError("Type of torrent_client is invalide. Must be a ClientThread.")
+            raise TypeError(
+                "Type of torrent_client is invalide. Must be a ClientThread.")
 
         self.client_thread = client_thread
         self.client_thread.bytesDownloadedChanged.connect(self.update_status)
@@ -43,7 +44,8 @@ class TorrentWidget(QtWidgets.QWidget):
         self.setLayout(layout)
 
     def update_status(self):
-        self.progress_info.setText('{downloaded} MB from {size} MB ({percent}%) {speed} KB/S'.format(
+        self.progress_info.setText('{downloaded} MB from {size} MB\
+            ({percent}%) {speed} KB/S'.format(
             downloaded=round(self.client_thread.downloaded / 2 ** 20, 2),
             size=round(self.client_thread.size / 2 ** 20, 2),
             percent=round(self.client_thread.percent, 2),
@@ -52,6 +54,7 @@ class TorrentWidget(QtWidgets.QWidget):
 
     def update_icon(self):
         file_icon_provider = QtWidgets.QFileIconProvider()
-        icon = file_icon_provider.icon(QtCore.QFileInfo(self.client_thread.work_path + self.client_thread.info.name))
+        icon = file_icon_provider.icon(QtCore.QFileInfo(
+            self.client_thread.work_path + self.client_thread.info.name))
         pixmap = icon.pixmap(QtCore.QSize(36, 36))
         self.icon_label.setPixmap(pixmap)

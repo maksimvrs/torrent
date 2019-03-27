@@ -37,7 +37,8 @@ class PeerStreamIterator:
                             self.buffer = b''
                         return KeepAlive()
                     if len(self.buffer) >= message_length + 4:
-                        message = self.parse(self.buffer[:message_length + 5], message_length)
+                        message = self.parse(
+                            self.buffer[:message_length + 5], message_length)
                         if len(self.buffer) > message_length + 4:
                             self.buffer = self.buffer[message_length + 4:]
                         else:
@@ -45,7 +46,8 @@ class PeerStreamIterator:
                         if message:
                             return message
                         raise StopAsyncIteration
-                self.buffer += await asyncio.wait_for(self.reader.read(PeerStreamIterator.CHUNK_SIZE), 15)
+                self.buffer += await asyncio.wait_for(
+                    self.reader.read(PeerStreamIterator.CHUNK_SIZE), 15)
 
             except ConnectionResetError:
                 logging.debug('Connection closed by peer')

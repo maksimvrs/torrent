@@ -89,7 +89,8 @@ class PeerConnection:
             try:
                 # TODO For some reason it does not seem to work to open a new
                 # connection if the first one drops (i.e. second loop).
-                self.reader, self.writer = await asyncio.wait_for(asyncio.open_connection(ip, port), 30)
+                self.reader, self.writer = await asyncio.wait_for(
+                    asyncio.open_connection(ip, port), 30)
                 logging.info('Connection open to peer: {ip}'.format(ip=ip))
 
                 # It's our responsibility to initiate the handshake.
@@ -150,14 +151,21 @@ class PeerConnection:
                     elif type(message) is Request:
                         for piece in self.piece_manager.have_pieces:
                             if piece[message.index].is_complete():
-                                data = self.piece_manager.file_manager.read(message.index, message.begin, message.length)
-                                self.writer.write(Piece(message.index, message.begin, data).encode())
+                                data = self.piece_manager.file_manager.read(
+                                    message.index,
+                                    message.begin,
+                                    message.length)
+                                self.writer.write(
+                                    Piece(message.index,
+                                          message.begin,
+                                          data).encode())
                                 await self.writer.drain()
                                 logging.info("Send data")
                     elif type(message) is Cancel:
                         pass
 
-                    logging.info(ip + ": " + str(self.peer_state) + str(self.my_state))
+                    logging.info(
+                        ip + ": " + str(self.peer_state) + str(self.my_state))
 
                     # Send block request to remote peer if we're interested
                     if PeerState.Choked not in self.peer_state:
@@ -215,10 +223,10 @@ class PeerConnection:
 
             logging.debug('Requesting block {block} for piece {piece} '
                           'of {length} bytes from peer {peer}'.format(
-                piece=block.piece,
-                block=block.offset,
-                length=block.length,
-                peer=self.remote_id))
+                              piece=block.piece,
+                              block=block.offset,
+                              length=block.length,
+                              peer=self.remote_id))
 
             self.writer.write(message)
             await self.writer.drain()
@@ -233,7 +241,8 @@ class PeerConnection:
 
         buf = b''
         while len(buf) < Handshake.length:
-            buf = await asyncio.wait_for(self.reader.read(PeerStreamIterator.CHUNK_SIZE), 15)
+            buf = await asyncio.wait_for(self.reader.read(
+                PeerStreamIterator.CHUNK_SIZE), 15)
 
         response = Handshake.decode(buf[:Handshake.length])
         if not response:

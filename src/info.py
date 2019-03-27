@@ -16,6 +16,7 @@ class Info(object):
     """
 
     """
+
     def __init__(self, file_name):
         self.file_name = file_name
 
@@ -23,12 +24,14 @@ class Info(object):
             self.data = Decoder(file.read()).decode()
 
         if b'announce' not in self.data:
-            raise AttributeError("The torrent file does not have an attribute announce")
+            raise AttributeError(
+                "The torrent file does not have an attribute announce")
 
         self.__metainfo__ = self.data.get(b'info')
         self.check_integrity()
 
-        self.peer_id = (PREFIX + VERSION + ''.join(random.sample(ascii_letters + digits, 13)))
+        self.peer_id = (PREFIX + VERSION +
+                        ''.join(random.sample(ascii_letters + digits, 13)))
 
         info_raw = Encoder(self.__metainfo__).encode()
         hash_raw = hashlib.sha1(info_raw)
@@ -37,20 +40,28 @@ class Info(object):
 
     def check_integrity(self):
         if not self.__metainfo__:
-            raise AttributeError("The torrent file does not have an attribute info")
+            raise AttributeError(
+                "The torrent file does not have an attribute info")
         if b'piece length' not in self.__metainfo__:
-            raise AttributeError("The torrent file does not have an attribute piece length")
+            raise AttributeError(
+                "The torrent file does not have an attribute piece length")
         if b'pieces' not in self.__metainfo__:
-            raise AttributeError("The torrent file does not have an attribute pieces")
+            raise AttributeError(
+                "The torrent file does not have an attribute pieces")
         if b'name' not in self.__metainfo__:
-            raise AttributeError("The torrent file does not have an attribute name")
-        if b'length' not in self.__metainfo__ and b'files' not in self.__metainfo__:
-            raise AttributeError("The torrent file does not have an attribute length or files")
+            raise AttributeError(
+                "The torrent file does not have an attribute name")
+        if b'length' not in self.__metainfo__ and \
+           b'files' not in self.__metainfo__:
+            raise AttributeError(
+                "The torrent file does not have an attribute length or files")
         # if b'files' in self.__metainfo__:
         #     if b'length' not in self.__metainfo__[b'files']:
-        #         raise AttributeError("The torrent file does not have an attribute length")
+        #         raise AttributeError(
+        #           "The torrent file does not have an attribute length")
         #     if b'name' not in self.__metainfo__[b'files']:
-        #         raise AttributeError("The torrent file does not have an attribute path")
+        #         raise AttributeError(
+        #           "The torrent file does not have an attribute path")
 
     @property
     def announce(self) -> str:
@@ -87,7 +98,8 @@ class Info(object):
 
     @property
     def pieces(self) -> list:
-        return [self.__metainfo__[b'pieces'][i:i+20] for i in range(0, len(self.__metainfo__[b'pieces']), 20)]
+        return [self.__metainfo__[b'pieces'][i:i + 20]
+                for i in range(0, len(self.__metainfo__[b'pieces']), 20)]
 
     @property
     def private(self) -> bool:
@@ -106,7 +118,9 @@ class Info(object):
     @property
     def files(self) -> list:
         return [{'length': file[b'length'],
-                 'path': [path.decode() for path in file[b'path']]} for file in self.__metainfo__[b'files']]
+                 'path': [path.decode()
+                          for path in file[b'path']]}
+                for file in self.__metainfo__[b'files']]
 
     @property
     def md5sum(self) -> str:

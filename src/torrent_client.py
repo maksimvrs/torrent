@@ -79,7 +79,10 @@ class TorrentClient:
                       for _ in range(MAX_PEER_CONNECTIONS)]
         self.piece_manager.start_time = time.time()
 
-        self.uploaders = [Uploader(self.uploader_queue, self.piece_manager)] * MAX_PEER_UPLOAD_CONNECTIONS
+        self.uploaders = [Uploader(
+            self.uploader_queue,
+            self.piece_manager
+        )] * MAX_PEER_UPLOAD_CONNECTIONS
 
         first = True
         interval = 15
@@ -93,7 +96,8 @@ class TorrentClient:
                     uploaded=self.piece_manager.bytes_uploaded,
                     downloaded=self.piece_manager.bytes_downloaded
                 )
-                # logging.info("Tracker response: {resp}".format(resp=(response if response is not None else 'None')))
+                # logging.info("Tracker response: {resp}".format(
+                #   resp=(response if response is not None else 'None')))
 
                 if response:
                     first = False
@@ -112,7 +116,8 @@ class TorrentClient:
             #
             # current = time.time()
             #
-            # if (dht_previous is None) or (dht_previous + dht_interval) < current:
+            # if (dht_previous is None) or \
+            #       (dht_previous + dht_interval) < current:
             #     try:
             #         response = await self.tracker.connect_dht()
             #         print("DHT: ", response)
@@ -152,9 +157,11 @@ class TorrentClient:
         :param data: The binary data retrieved
         """
         self.downloaded.append((len(data), time.time()))
-        if time.time() - self.prev_speed_check_time >= SPEED_CALCULATE_INTERVAL:
+        if time.time() - self.prev_speed_check_time \
+                >= SPEED_CALCULATE_INTERVAL:
             while len(self.downloaded) >= 2 and \
-                    self.downloaded[-1][1] - self.downloaded[0][1] > SPEED_CALCULATE_INTERVAL * 5:
+                self.downloaded[-1][1]
+            - self.downloaded[0][1] > SPEED_CALCULATE_INTERVAL * 5:
                 del self.downloaded[0]
             size = sum([i[0] for i in self.downloaded])
             time_interval = self.downloaded[-1][1] - self.downloaded[0][1]
@@ -169,7 +176,8 @@ class TorrentClient:
         self.uploader_queue.put_nowait((reader, writer))
 
     async def listen(self):
-        server = await asyncio.start_server(self.new_connection_handle, '0.0.0.0', 6889)
+        server = await asyncio.start_server(self.new_connection_handle,
+                                            '0.0.0.0', 6889)
         addr = server.sockets[0].getsockname()
         async with server:
             await server.serve_forever()
@@ -300,7 +308,8 @@ class PieceManager:
         self.max_pending_time = 30 * 1000  # 30 second
         self.total_pieces = len(info.pieces)
 
-        # self.have_pieces = self.missing_pieces[0:int(len(self.missing_pieces)*0.9)]
+        # self.have_pieces = self.missing_pieces[0:int(
+        #    len(self.missing_pieces)*0.9)]
         # del self.missing_pieces[0:int(len(self.missing_pieces)*0.9)]
 
     def _init_pieces(self) -> [Piece]:
@@ -358,7 +367,8 @@ class PieceManager:
         This method Only counts full, verified, pieces, not single blocks.
         """
         return len(self.have_pieces) * self.info.piece_length - \
-            ((self.info.length % self.info.piece_length) if self.is_complete else 0)
+            ((self.info.length % self.info.piece_length)
+             if self.is_complete else 0)
 
     @property
     def bytes_uploaded(self) -> int:
@@ -463,14 +473,14 @@ class PieceManager:
                     self.file_manager.write(piece)
                     self.ongoing_pieces.remove(piece)
                     self.have_pieces.append(piece)
-                    complete = (self.total_pieces -
-                                len(self.missing_pieces) -
-                                len(self.ongoing_pieces))
+                    complete = (self.total_pieces
+                                - len(self.missing_pieces)
+                                - len(self.ongoing_pieces))
                     logging.info(
                         '{complete} / {total} pieces downloaded {per:.3f} %'
-                            .format(complete=complete,
-                                    total=self.total_pieces,
-                                    per=(complete / self.total_pieces) * 100))
+                        .format(complete=complete,
+                                total=self.total_pieces,
+                                per=(complete / self.total_pieces) * 100))
                 else:
                     logging.info('Discarding corrupt piece {index}'
                                  .format(index=piece.index))
@@ -493,8 +503,8 @@ class PieceManager:
                 if request.start_time + self.max_pending_time < current:
                     logging.info('Re-requesting block {block} for '
                                  'piece {piece}'.format(
-                        block=request.offset,
-                        piece=request.piece))
+                                     block=request.offset,
+                                     piece=request.piece))
                     # Reset expiration timer
                     request.start_time = current
                     return request

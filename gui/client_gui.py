@@ -13,11 +13,14 @@ class ClientGUI(QtWidgets.QMainWindow):
         self.torrents = []
         self.setAcceptDrops(True)
         # Init GUI
-        screen_width = QtWidgets.QApplication.desktop().screenGeometry().width()
-        screen_height = QtWidgets.QApplication.desktop().screenGeometry().height()
+        screen_width = QtWidgets.QApplication.desktop()\
+            .screenGeometry().width()
+        screen_height = QtWidgets.QApplication.desktop()\
+            .screenGeometry().height()
         width = 500
         height = 300
-        self.setGeometry((screen_width - width) / 2, (screen_height - height) / 2, width, height)
+        self.setGeometry((screen_width - width) / 2,
+                         (screen_height - height) / 2, width, height)
         self.setWindowTitle('Torrent')
 
         # Toolbar
@@ -28,7 +31,8 @@ class ClientGUI(QtWidgets.QMainWindow):
         tab_bar.addAction(action_open)
         action_save = QtWidgets.QAction("Remove", self)
         tab_bar.addAction(action_save)
-        tab_bar.actionTriggered[QtWidgets.QAction].connect(self.tool_bar_action)
+        tab_bar.actionTriggered[QtWidgets.QAction].connect(
+            self.tool_bar_action)
 
         # ListView
         self.torrents_list = QtWidgets.QListWidget(self)
@@ -43,10 +47,12 @@ class ClientGUI(QtWidgets.QMainWindow):
     def tool_bar_action(self, action):
         if action.text() == "New":
             default_path = '~/'
-            path_list = QtCore.QStandardPaths.standardLocations(QtCore.QStandardPaths.HomeLocation)
+            path_list = QtCore.QStandardPaths.standardLocations(
+                QtCore.QStandardPaths.HomeLocation)
             if path_list:
                 default_path = path_list[0]
-            file_name = QtWidgets.QFileDialog.getOpenFileName(self, 'Open file', default_path, "Torrent(*.torrent)")[0]
+            file_name = QtWidgets.QFileDialog.getOpenFileName(
+                self, 'Open file', default_path, "Torrent(*.torrent)")[0]
             self.open(file_name)
             # print(file_name)
             # self.start(file_name)
@@ -110,4 +116,3 @@ class ClientGUI(QtWidgets.QMainWindow):
             if i[1] == self.sender():
                 self.torrents_list.removeItemWidget(i[0])
                 self.torrents_list.takeItem(self.torrents_list.row(i[0]))
-

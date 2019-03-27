@@ -112,6 +112,7 @@ class KeepAlive(PeerMessage):
     Message format:
         <len=0000>
     """
+
     def __str__(self):
         return 'KeepAlive'
 
@@ -123,6 +124,7 @@ class BitField(PeerMessage):
     Message format:
         <len=0001+X><id=5><bitfield>
     """
+
     def __init__(self, data):
         self.bitfield = BitArray(data)
 
@@ -140,7 +142,8 @@ class BitField(PeerMessage):
     @classmethod
     def decode(cls, data: bytes):
         message_length = struct.unpack('>I', data[:4])[0]
-        parts = struct.unpack('>Ib' + str(len(data) - 5) + 's', data)[2][:message_length - 1]
+        parts = struct.unpack('>Ib' + str(len(data) - 5) +
+                              's', data)[2][:message_length - 1]
         return cls(parts)
 
     def __str__(self):
@@ -177,6 +180,7 @@ class NotInterested(PeerMessage):
     Message format:
         <len=0001><id=3>
     """
+
     def __str__(self):
         return 'NotInterested'
 
@@ -188,6 +192,7 @@ class Choke(PeerMessage):
     Message format:
         <len=0001><id=0>
     """
+
     def __str__(self):
         return 'Choke'
 
@@ -199,6 +204,7 @@ class Unchoke(PeerMessage):
     Message format:
         <len=0001><id=1>
     """
+
     def __str__(self):
         return 'Unchoke'
 
@@ -208,6 +214,7 @@ class Have(PeerMessage):
     Represents a piece successfully downloaded by the remote peer. The piece
     is a zero based index of the torrents pieces
     """
+
     def __init__(self, index: int):
         self.index = index
 
@@ -235,7 +242,9 @@ class Request(PeerMessage):
     Message format:
         <len=0013><id=6><index><begin><length>
     """
-    def __init__(self, index: int, begin: int, length: int = DEFAULT_REQUEST_SIZE):
+
+    def __init__(self, index: int, begin: int,
+                 length: int = DEFAULT_REQUEST_SIZE):
         """
         Constructs the Request message.
         :param index: The zero based piece index
@@ -313,6 +322,7 @@ class Cancel(PeerMessage):
     Message format:
          <len=0013><id=8><index><begin><length>
     """
+
     def __init__(self, index, begin, length: int = DEFAULT_REQUEST_SIZE):
         self.index = index
         self.begin = begin

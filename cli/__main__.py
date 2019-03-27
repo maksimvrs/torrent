@@ -26,12 +26,14 @@ async def start(file, work_path):
 
 
 def bytes_downloaded_changed():
-    size = sum(map(lambda x: x['length'], info.files)) if info.is_multi_file else info.length
-    sys.stdout.write('\rDownloaded {downloaded} MB from {size} MB ({percent}%) {speed} KB/S'.format(
-            downloaded=round(client.piece_manager.bytes_downloaded / 2 ** 20, 2),
-            size=round(size / 2 ** 20, 2),
-            percent=round(client.piece_manager.bytes_downloaded / size * 100, 2),
-            speed=round(client.speed / 2 ** 10, 2)))
+    size = sum(map(lambda x: x['length'], info.files)
+               ) if info.is_multi_file else info.length
+    sys.stdout.write('\rDownloaded {downloaded} MB from {size} MB \
+        ({percent}%) {speed} KB/S'.format(
+        downloaded=round(client.piece_manager.bytes_downloaded / 2 ** 20, 2),
+        size=round(size / 2 ** 20, 2),
+        percent=round(client.piece_manager.bytes_downloaded / size * 100, 2),
+        speed=round(client.speed / 2 ** 10, 2)))
     sys.stdout.flush()
 
 

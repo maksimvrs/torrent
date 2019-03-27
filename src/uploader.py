@@ -83,8 +83,13 @@ class Uploader:
                     elif isinstance(message) is Request:
                         for piece in self.piece_manager.have_pieces:
                             if piece[message.index].is_complete():
-                                data = self.piece_manager.file_manager.read(message.index, message.begin, message.length)
-                                self.writer.write(Piece(message.index, message.begin, data).encode())
+                                data = self.piece_manager.file_manager.read(
+                                    message.index, message.begin,
+                                    message.length)
+                                self.writer.write(
+                                    Piece(message.index,
+                                          message.begin,
+                                          data).encode())
                                 await self.writer.drain()
                                 logging.info("Send data")
                     elif isinstance(message) is Cancel:
@@ -100,13 +105,15 @@ class Uploader:
                 logging.exception(error)
                 await self.close()
             except Exception as error:
-                logging.exception('Undefind error: ' + str(error) + str(message))
+                logging.exception('Undefind error: ' +
+                                  str(error) + str(message))
                 await self.close()
 
     async def _handshake(self):
         buf = b''
         while len(buf) < Handshake.length:
-            buf = await asyncio.wait_for(self.reader.read(PeerStreamIterator.CHUNK_SIZE), 60)
+            buf = await asyncio.wait_for(self.reader.read(
+                PeerStreamIterator.CHUNK_SIZE), 60)
 
         response = Handshake.decode(buf[:Handshake.length])
         if not response:

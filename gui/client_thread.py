@@ -23,7 +23,8 @@ class ClientThread(QtCore.QThread):
 
     async def run_async(self):
         self.client = TorrentClient(self.info, self.files, self.work_path)
-        self.client.piece_manager.bytes_downloaded_changed = self.bytes_downloaded_changed
+        self.client.piece_manager.bytes_downloaded_changed =\
+            self.bytes_downloaded_changed
         self.clientCreated.emit()
         try:
             await self.client.start()
@@ -47,7 +48,8 @@ class ClientThread(QtCore.QThread):
     @property
     def size(self):
         if self.info.is_multi_file:
-            return sum(map(lambda x: x['length'], self.clientThread.info.files))
+            return sum(map(lambda x: x['length'],
+                           self.clientThread.info.files))
         else:
             return self.info.length
 

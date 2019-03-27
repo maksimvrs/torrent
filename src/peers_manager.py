@@ -3,7 +3,8 @@ from src.peer import PeerConnection, PeerState
 
 
 class PeersManager:
-    def __init__(self, queue, info_hash, peer_id, piece_manager, on_block_cb=None,
+    def __init__(self, queue, info_hash, peer_id, piece_manager,
+                 on_block_cb=None,
                  max_download_peers=35, max_upload_peers=35):
         self.max_download_peers = max_download_peers
         self.max_upload_peers = max_upload_peers
@@ -19,13 +20,15 @@ class PeersManager:
         await self.update_download()
 
     async def start_upload(self):
-        server = await asyncio.start_server(self.new_connection_handle, '0.0.0.0', 6889)
+        server = await asyncio.start_server(self.new_connection_handle,
+                                            '0.0.0.0', 6889)
         addr = server.sockets[0].getsockname()
         async with server:
             await server.serve_forever()
 
     async def new_connection_handle(self, reader, writer):
-        peer = PeerConnection(reader, writer, self.info_hash, self.peer_id, self.piece_manager, self.on_block_cb,
+        peer = PeerConnection(reader, writer, self.info_hash, self.peer_id,
+                              self.piece_manager, self.on_block_cb,
                               self.update_upload)
         my_state = [PeerState.Interested, PeerState.Choke]
         peer_state = [PeerState.Choke]
@@ -39,12 +42,15 @@ class PeersManager:
 
         while len(self.download_peers) < self.max_download_peers:
             ip, port = await self.peers.get()
-            reader, writer = await asyncio.wait_for(asyncio.open_connection(ip, port), 30)
-            peer = PeerConnection(reader, writer, self.info_hash, self.peer_id, self.piece_manager, self.on_block_cb,
+            reader, writer = await asyncio.wait_for(
+                asyncio.open_connection(ip, port), 30)
+            peer = PeerConnection(reader, writer, self.info_hash, self.peer_id,
+                                  self.piece_manager, self.on_block_cb,
                                   self.update_download)
             my_state = [PeerState.Interested, PeerState.Choke]
             peer_state = [PeerState.Choke]
-            peer_future = asyncio.ensure_future(peer.start(my_state, peer_state))
+            peer_future = asyncio.ensure_future(
+                peer.start(my_state, peer_state))
             self.download_peers.append(peer)
 
     async def update_upload(self):
