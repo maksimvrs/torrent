@@ -109,4 +109,5 @@ class ClientGUI(QtWidgets.QMainWindow):
         for i in self.torrents:
             if i[1] == self.sender():
                 self.torrents_list.removeItemWidget(i[0])
+                self.torrents_list.takeItem(self.torrents_list.row(i[0]))
 
