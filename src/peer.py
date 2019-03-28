@@ -111,7 +111,6 @@ class PeerConnection:
                 # Start reading responses as a stream of messages for as
                 # long as the connection is open and data is transmitted
                 async for message in PeerStreamIterator(self.reader, buffer):
-                    print(message)
                     if PeerState.Stopped in self.my_state:
                         break
                     if message is None:
@@ -244,7 +243,6 @@ class PeerConnection:
         while len(buf) < Handshake.length:
             buf = await asyncio.wait_for(self.reader.read(
                 PeerStreamIterator.CHUNK_SIZE), 15)
-
         response = Handshake.decode(buf[:Handshake.length])
         if not response:
             raise ProtocolError('Unable receive and parse a handshake')

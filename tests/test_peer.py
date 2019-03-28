@@ -39,6 +39,6 @@ class PeerTests(unittest.TestCase):
 
         await available_peers.put(result.peers[0])
 
-        await asyncio.sleep(15)
+        await asyncio.sleep(5)
 
         print(peer_connection.my_state)
