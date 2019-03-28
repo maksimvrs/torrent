@@ -5,7 +5,7 @@ from src.info import Info
 
 class UbuntuTorrentTests(unittest.TestCase):
     def setUp(self):
-        self.t = Info('./ubuntu.iso.torrent')
+        self.t = Info('./data/ubuntu.iso.torrent')
 
     def test_instantiate(self):
         self.assertIsNotNone(self.t)
@@ -30,11 +30,11 @@ class UbuntuTorrentTests(unittest.TestCase):
     def test_hash_value(self):
         # hexdigest of the SHA1 '4344503b7e797ebf31582327a5baae35b11bda01',
         self.assertEqual(
-            b'\xc7\xf30|\x8f\x11FM=^\xec\xde^\xc6\x97"\xd5qA\xbe',
+            b'\xa4\x10J\x9d/V\x15`\x1cB\x9f\xe8\xba\xb8\x17|G\xc0\\\x84',
             self.t.hash20)
 
     def test_total_size(self):
-        self.assertEqual(912261120, self.t.length)
+        self.assertEqual(851443712, self.t.length)
 
     def test_pieces(self):
-        self.assertEqual(34800, len(self.t.pieces))
+        self.assertEqual(1624, len(self.t.pieces))

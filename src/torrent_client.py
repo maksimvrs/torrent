@@ -425,7 +425,7 @@ class PieceManager:
                 return piece.next_request()
             return None
 
-        if len(self.missing_pieces) < self.MAX_PEER_CONNECTIONS:
+        if len(self.missing_pieces) < TorrentClient.MAX_PEER_CONNECTIONS:
             block = self._next_missing(peer_id)
             if not block:
                 block = self._expired_requests(peer_id)

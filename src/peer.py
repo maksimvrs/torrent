@@ -111,6 +111,7 @@ class PeerConnection:
                 # Start reading responses as a stream of messages for as
                 # long as the connection is open and data is transmitted
                 async for message in PeerStreamIterator(self.reader, buffer):
+                    print(message)
                     if PeerState.Stopped in self.my_state:
                         break
                     if message is None:
@@ -184,7 +185,7 @@ class PeerConnection:
                 logging.exception(e)
                 await self.cancel()
             except Exception as e:
-                logging.exception('Undefind error: ' + str(e) + str(message))
+                logging.exception('Undefind error: ' + str(e))
                 await self.cancel()
                 continue
         await self.cancel()

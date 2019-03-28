@@ -32,4 +32,3 @@ class TrackerTests(unittest.TestCase):
         await tracker.close()
         self.assertFalse(result.failure is None)
         print(result)
-
