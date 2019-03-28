@@ -105,8 +105,8 @@ class Uploader:
                 logging.exception(error)
                 await self.close()
             except Exception as error:
-                logging.exception('Undefind error: ' +
-                                  str(error) + str(message))
+                logging.exception('Undefind error: '
+                                  + str(error) + str(message))
                 await self.close()
 
     async def _handshake(self):

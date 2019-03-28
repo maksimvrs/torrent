@@ -30,8 +30,8 @@ class Info(object):
         self.__metainfo__ = self.data.get(b'info')
         self.check_integrity()
 
-        self.peer_id = (PREFIX + VERSION +
-                        ''.join(random.sample(ascii_letters + digits, 13)))
+        self.peer_id = (PREFIX + VERSION
+                        + ''.join(random.sample(ascii_letters + digits, 13)))
 
         info_raw = Encoder(self.__metainfo__).encode()
         hash_raw = hashlib.sha1(info_raw)

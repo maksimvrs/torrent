@@ -80,8 +80,8 @@ class FileManager:
             files_offset = 0
             for i, file in enumerate(self.info.files):
                 if files_offset < self.info.piece_length * index + offset:
-                    os.lseek(self.fd[i], index *
-                             self.info.piece_length + offset, os.SEEK_SET)
+                    os.lseek(self.fd[i], index
+                             * self.info.piece_length + offset, os.SEEK_SET)
                     data += os.read(self.fd[i], length)
                     if self.info.piece_length * index + offset + \
                             length < files_offset + file['length']:
@@ -90,8 +90,8 @@ class FileManager:
                     offset += file['length']
             return data
         else:
-            os.lseek(self.fd, index * self.info.piece_length +
-                     offset, os.SEEK_SET)
+            os.lseek(self.fd, index * self.info.piece_length
+                     + offset, os.SEEK_SET)
             return os.read(self.fd, length)
 
     def close(self):

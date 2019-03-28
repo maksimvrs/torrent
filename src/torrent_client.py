@@ -10,10 +10,6 @@ from src.peer import PeerConnection, REQUEST_SIZE
 from src.uploader import Uploader
 from src.file_manager import FileManager
 
-MAX_PEER_CONNECTIONS = 35
-MAX_PEER_UPLOAD_CONNECTIONS = 15
-SPEED_CALCULATE_INTERVAL = 1
-
 
 class TorrentClient:
     """
@@ -30,6 +26,10 @@ class TorrentClient:
     (or worse yet processes) we can create them all at once and they will
     be waiting until there is a peer to consume in the queue.
     """
+
+    MAX_PEER_CONNECTIONS = 35
+    MAX_PEER_UPLOAD_CONNECTIONS = 15
+    SPEED_CALCULATE_INTERVAL = 1
 
     def __init__(self, info, files, work_path):
         self.tracker = Tracker(info)
@@ -76,13 +76,13 @@ class TorrentClient:
                                      self.info.peer_id,
                                      self.piece_manager,
                                      self._on_block_retrieved)
-                      for _ in range(MAX_PEER_CONNECTIONS)]
+                      for _ in range(self.MAX_PEER_CONNECTIONS)]
         self.piece_manager.start_time = time.time()
 
         self.uploaders = [Uploader(
             self.uploader_queue,
             self.piece_manager
-        )] * MAX_PEER_UPLOAD_CONNECTIONS
+        )] * self.MAX_PEER_UPLOAD_CONNECTIONS
 
         first = True
         interval = 15
@@ -158,10 +158,9 @@ class TorrentClient:
         """
         self.downloaded.append((len(data), time.time()))
         if time.time() - self.prev_speed_check_time \
-                >= SPEED_CALCULATE_INTERVAL:
-            while len(self.downloaded) >= 2 and \
-                self.downloaded[-1][1]
-            - self.downloaded[0][1] > SPEED_CALCULATE_INTERVAL * 5:
+                >= self.SPEED_CALCULATE_INTERVAL:
+            while len(self.downloaded) >= 2 and self.downloaded[-1][1]\
+                  - self.downloaded[0][1] > self.SPEED_CALCULATE_INTERVAL * 5:
                 del self.downloaded[0]
             size = sum([i[0] for i in self.downloaded])
             time_interval = self.downloaded[-1][1] - self.downloaded[0][1]
@@ -426,7 +425,7 @@ class PieceManager:
                 return piece.next_request()
             return None
 
-        if len(self.missing_pieces) < MAX_PEER_CONNECTIONS:
+        if len(self.missing_pieces) < self.MAX_PEER_CONNECTIONS:
             block = self._next_missing(peer_id)
             if not block:
                 block = self._expired_requests(peer_id)

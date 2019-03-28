@@ -103,7 +103,7 @@ class Tracker:
     def __init__(self, info):
         self.info = info
         self.session = aiohttp.ClientSession(
-            connector=aiohttp.TCPConnector(verify_ssl=False))
+            connector=aiohttp.TCPConnector(ssl=False))
 
     # @staticmethod
     # async def connect_dht():
